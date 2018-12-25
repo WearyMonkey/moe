@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./src",
+    "experimentalDecorators": true,
+    "importHelpers": false,
+    "jsx": "react",
+    "jsxFactory": "h",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es2016"
+    ],
+    "moduleResolution": "node",
+    "outDir": "target",
+    "strict": true,
+    "skipLibCheck": true,
+    "target": "es6",
+    "sourceMap": true,
+    "module": "ESNext"
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
