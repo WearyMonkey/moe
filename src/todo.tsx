@@ -1,7 +1,7 @@
-import {h} from './micro';
-import {BehaviorSubject, combineLatest, Observable} from "rxjs";
+import {appendTo, h} from './micro';
+import {BehaviorSubject, combineLatest} from "rxjs";
 import {arrayUpdates} from "./observable_connect";
-import {map, mergeMap} from "rxjs/operators";
+import {map} from "rxjs/operators";
 import {MicroNode} from "./micro_types";
 
 interface Todo {
@@ -75,7 +75,7 @@ function Todo({ todo }: { todo: Todo }): MicroNode {
                 <div class="view">
                     <input class="toggle" type="checkbox" checked={todo.completed} onChange={onToggle}/>
                     <label>{todo.text}</label>
-                    <button class="destroy" onClick={onDelete}></button>
+                    <button class="destroy" onClick={onDelete}/>
                 </div>
                 <input class="edit" value={todo.text}/>
             </li>
@@ -84,4 +84,4 @@ function Todo({ todo }: { todo: Todo }): MicroNode {
     ));
 }
 
-document.getElementById('root')!.appendChild(<TodoApp/>);
+appendTo(document.getElementById('root')!, <TodoApp/>);

@@ -1,7 +1,6 @@
 import {Subscribable, Unsubscribable} from "rxjs";
 import {ArrayUpdate, MicroNode} from "./micro_types";
 
-const eles = new WeakMap<Node, { onAdd: (ele: Element) => void, onRemove: (ele: Element) => void }>();
 const updates: (() => void)[] = [];
 
 requestAnimationFrame(function runUpdates() {
@@ -12,27 +11,6 @@ requestAnimationFrame(function runUpdates() {
     requestAnimationFrame(runUpdates);
 });
 
-new MutationObserver(records => {
-    for (const record of records) {
-        for (const root of record.addedNodes) {
-            if (root instanceof Element) {
-                for (const node of [root, ...root.getElementsByTagName('*')]) {
-                    const cbs = eles.get(node);
-                    cbs && cbs.onAdd(node);
-                }
-            }
-        }
-        for (const root of record.removedNodes) {
-            if (root instanceof Element) {
-                for (const node of [root, ...root.getElementsByTagName('*')]) {
-                    const cbs = eles.get(node);
-                    cbs && cbs.onRemove(node);
-                }
-            }
-        }
-    }
-}).observe(document.body, {childList: true, subtree: true});
-
 export function h(tag: string | ((props: any) => Node), props: Record<string, any>, ...children: MicroNode[]): MicroNode {
 
     if (typeof tag === 'function') {
@@ -41,7 +19,7 @@ export function h(tag: string | ((props: any) => Node), props: Record<string, an
 
     const ele = document.createElement(tag);
     const subscribles: ((ele: Element) => Unsubscribable)[] = [];
-    let unsubscribables: Unsubscribable[] = [];
+    let unsubscribables: Unsubscribable[];
 
     if (props) {
         for (const prop of Object.keys(props)) {
@@ -60,30 +38,33 @@ export function h(tag: string | ((props: any) => Node), props: Record<string, an
 
     const nodeTree = renderNode(children, ele, null, null);
 
-    eles.set(ele, {
-        onAdd: ele => {
-            add(ele, nodeTree);
-            unsubscribables = subscribles.map(s => s(ele));
-        },
-        onRemove: () => {
-            remove(ele, nodeTree, false);
-            unsubscribables.forEach(s => s.unsubscribe());
+    return subscribles.length
+        ? {
+            root: ele,
+            children: [nodeTree],
+            lastNode: ele,
+            onAdd: () => unsubscribables = subscribles.map(s => s(ele)),
+            onRemove: () => unsubscribables.forEach(s => s.unsubscribe()),
         }
-    });
+        : nodeTree;
+}
 
-    return ele;
+export function appendTo(target: Node, source: MicroNode) {
+    const nodeTree = renderNode(source, target, null, target.lastChild);
+    add(nodeTree);
 }
 
 type OptionalNode = Node | null | undefined;
 
-type NodeTree = {
+interface NodeTree {
+    root: Node,
     parent: NodeTree | null,
     lastNode: OptionalNode,
     children: (NodeTree | OptionalNode)[],
-    sub?: (ele: Node) => void,
-    unsub?: () => void,
-    onDom?: boolean,
-};
+    onAdd?: (ele: Node) => void,
+    onRemove?: () => void,
+    isOnDom?: boolean,
+}
 
 function renderNode(node: MicroNode, root: Node, parent: NodeTree | null, insertAfter: OptionalNode): NodeTree | OptionalNode {
     if (node instanceof Node) {
@@ -94,30 +75,49 @@ function renderNode(node: MicroNode, root: Node, parent: NodeTree | null, insert
         root.insertBefore(n, insertAfter ? insertAfter.nextSibling : root.firstChild);
         return n;
     } else if (isSubscribable(node)) {
-        const nodeTree: NodeTree = { children: [], lastNode: null, parent };
-        nodeTree.sub = root => {
-            const unsub = node.subscribe(child => {
-                if (isReadonOnlyArray(child)) {
-                    handleArrayUpdate(root, child, nodeTree);
+        const nodeTree: NodeTree = { root, children: [], lastNode: null, parent };
+        nodeTree.onAdd = root => {
+            let oldValue: MicroNode | undefined;
+            const unsub = node.subscribe(value => updates.push(() => {
+                if (value === oldValue) {
+                    return;
+                }
+                oldValue = value;
+                if (isReadonOnlyArray(value)) {
+                    handleArrayUpdate(root, value, nodeTree);
                 } else {
                     remove(root, nodeTree.children[0], true);
-                    const childNodeTree = renderNode(child, root, nodeTree, getInsertAfter(nodeTree));
+                    const childNodeTree = renderNode(value, root, nodeTree, getInsertAfter(nodeTree));
                     nodeTree.children[0] = childNodeTree;
                     nodeTree.lastNode = getLastNode(childNodeTree);
+                    add(nodeTree.children[0]);
                 }
-            });
-            nodeTree.unsub = () => unsub.unsubscribe();
+            }));
+            nodeTree.onRemove = () => unsub.unsubscribe();
         };
-        parent && parent.onDom && add(root, nodeTree);
         return nodeTree;
     } else if (isReadonOnlyArray(node)) {
-        const nodeTree: NodeTree = { children: Array(node.length), lastNode: null, parent, onDom: !!parent && parent.onDom };
+        const nodeTree: NodeTree = {
+            root,
+            children: Array(node.length),
+            lastNode: null,
+            parent
+        };
         for (let i = 0; i < node.length; ++i) {
             const childNodeTree = renderNode(node[i], root, nodeTree, nodeTree.lastNode || insertAfter);
             nodeTree.children[i] = childNodeTree;
             nodeTree.lastNode = getLastNode(childNodeTree) || nodeTree.lastNode;
         }
-        parent && parent.onDom && add(root, nodeTree);
+        return nodeTree;
+    } else if (node) {
+        const child = node as NodeTree;
+        root.insertBefore(child.root, insertAfter ? insertAfter.nextSibling : root.firstChild);
+        let nodeTree = {
+            root,
+            children: [child],
+            parent,
+            lastNode: child.root
+        };
         return nodeTree;
     } else {
         return null;
@@ -147,10 +147,8 @@ function handleArrayUpdate(root: Node, updates: ReadonlyArray<ArrayUpdate>, node
 
         nodeTree.children.splice(index, update.removed, ...addedChildren);
 
-        if (nodeTree.onDom) {
-            for (const added of addedChildren) {
-                add(root, added);
-            }
+        for (const added of addedChildren) {
+            add(added);
         }
     }
 
@@ -169,7 +167,7 @@ function getLastNode(childNodeTree: NodeTree | OptionalNode) {
 
 function getInsertAfter(child: NodeTree): OptionalNode {
     let parent = child.parent;
-    while (parent) {
+    while (parent && parent.root === child.root) {
         let lastNode;
         for (let i = 0; i < parent.children.length && parent.children[i] !== child; ++i) {
             lastNode = getLastNode(parent.children[i])
@@ -186,12 +184,12 @@ function getInsertAfter(child: NodeTree): OptionalNode {
     return null;
 }
 
-function add(root: Node, nodeTree: NodeTree | OptionalNode) {
-    if (!(nodeTree instanceof Node) && nodeTree && !nodeTree.onDom) {
-        nodeTree.onDom = true;
-        nodeTree.sub && nodeTree.sub(root);
+function add(nodeTree: NodeTree | OptionalNode) {
+    if (!(nodeTree instanceof Node) && nodeTree && !nodeTree.isOnDom) {
+        nodeTree.isOnDom = true;
+        nodeTree.onAdd && nodeTree.onAdd(nodeTree.root);
         for (const child of nodeTree.children) {
-            add(root, child);
+            add(child);
         }
     }
 }
@@ -200,11 +198,15 @@ function remove(root: Node, nodeTree: NodeTree | OptionalNode, removeFromDom: bo
     if (nodeTree instanceof Node) {
         removeFromDom && root.removeChild(nodeTree);
     } else if (nodeTree) {
-        for (const child of nodeTree.children) {
-            remove(root, child, removeFromDom);
+        if (removeFromDom && (!nodeTree.parent || nodeTree.parent.root !== nodeTree.root)) {
+            root.removeChild(nodeTree.root);
+            removeFromDom = false;
         }
-        nodeTree.unsub && nodeTree.unsub();
-        nodeTree.onDom = false;
+        for (const child of nodeTree.children) {
+            remove(nodeTree.root, child, removeFromDom);
+        }
+        nodeTree.onRemove && nodeTree.onRemove();
+        nodeTree.isOnDom = false;
     }
 }
 
