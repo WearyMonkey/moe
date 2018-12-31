@@ -1,6 +1,6 @@
 import {BehaviorSubject, combineLatest, interval, Observable, of} from "rxjs";
 import {map} from "rxjs/operators";
-import {h} from './micro';
+import {appendTo, h} from './micro';
 import {arrayUpdates} from "./observable_connect";
 
 const foo = new BehaviorSubject(0);
@@ -32,11 +32,11 @@ function JustAnElement() {
     return document.createTextNode('hello');
 }
 
-// document.getElementById('root')!.appendChild(<EvenOdd a={foo} b={of(1)}/>);
+appendTo(document.getElementById('root')!, <EvenOdd a={foo} b={of(1)}/>);
 
 
 const n = new BehaviorSubject<number[]>([1, 2, 3]);
 
-document.getElementById('root')!.appendChild(<div>
-    {n.pipe(arrayUpdates(n => ({ key: n, node: () => <span>{n}</span> })))}
-</div>);
+// document.getElementById('root')!.appendChild(<div>
+//     {n.pipe(arrayUpdates(n => ({ key: n, node: () => <span>{n}</span> })))}
+// </div>);

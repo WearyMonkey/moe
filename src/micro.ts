@@ -90,7 +90,7 @@ function renderNode(node: MicroNode, root: Node, insertAfter: OptionalNode): Nod
                 } else {
                     remove(root, nodeTree.children[0], true);
                     const childNodeTree = renderNode(value, root, getInsertAfter(nodeTree));
-                    if (childNodeTree && !(childNodeTree instanceof Node)) {
+                    if (isNodeTree(childNodeTree)) {
                         childNodeTree.parent = nodeTree;
                     }
                     nodeTree.children[0] = childNodeTree;
@@ -108,7 +108,7 @@ function renderNode(node: MicroNode, root: Node, insertAfter: OptionalNode): Nod
         for (let i = 0; i < node.length; ++i) {
             const childNodeTree = renderNode(node[i], root, lastNode || insertAfter);
             children[i] = childNodeTree;
-            if (childNodeTree && !(childNodeTree instanceof Node)) {
+            if (isNodeTree(childNodeTree)) {
                 nodeTree = nodeTree || {
                     root,
                     children,
@@ -122,13 +122,12 @@ function renderNode(node: MicroNode, root: Node, insertAfter: OptionalNode): Nod
         }
         nodeTree && (nodeTree.lastNode = lastNode);
         return nodeTree || lastNode;
-    } else if (node) {
-        const child = node as NodeTree;
-        root.insertBefore(child.root, insertAfter ? insertAfter.nextSibling : root.firstChild);
+    } else if (isNodeTree(node)) {
+        root.insertBefore(node.root, insertAfter ? insertAfter.nextSibling : root.firstChild);
         return {
             root,
-            children: [child],
-            lastNode: child.root
+            children: [node],
+            lastNode: node.root
         };
     } else {
         return null;
@@ -152,7 +151,7 @@ function handleArrayUpdate(root: Node, updates: ReadonlyArray<ArrayUpdate>, node
 
         for (const added of update.added) {
             const childNodeTree = renderNode(added, root, insertAfter);
-            if (childNodeTree && !(childNodeTree instanceof Node)) {
+            if (isNodeTree(childNodeTree)) {
                 childNodeTree.parent = nodeTree;
             }
             insertAfter = getLastNode(childNodeTree) || insertAfter;
@@ -175,8 +174,8 @@ function handleArrayUpdate(root: Node, updates: ReadonlyArray<ArrayUpdate>, node
     }
 }
 
-function getLastNode(childNodeTree: NodeTree | OptionalNode) {
-    return childNodeTree && (childNodeTree instanceof Node ? childNodeTree : childNodeTree.lastNode);
+function getLastNode(childNodeTree: NodeTree | OptionalNode): OptionalNode {
+    return isNodeTree(childNodeTree) ? childNodeTree.lastNode : childNodeTree;
 }
 
 function getInsertAfter(child: NodeTree): OptionalNode {
@@ -234,6 +233,10 @@ function applyProp(ele: Element, propName: string, value: any, previousValue: an
     } else {
         ele.setAttribute(propName, value);
     }
+}
+
+function isNodeTree(o: NodeTree | OptionalNode): o is NodeTree {
+    return (!!o && !(o instanceof Node));
 }
 
 function isReadonOnlyArray(a: any): a is ReadonlyArray<any> {
