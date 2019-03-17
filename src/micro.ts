@@ -198,7 +198,7 @@ function getInsertAfter(child: NodeTree): OptionalNode {
 }
 
 function add(nodeTree: NodeTree | OptionalNode) {
-    if (!(nodeTree instanceof Node) && nodeTree && !nodeTree.isOnDom) {
+    if (isNodeTree(nodeTree) && !nodeTree.isOnDom) {
         nodeTree.isOnDom = true;
         nodeTree.onAdd && nodeTree.onAdd(nodeTree.root);
         for (const child of nodeTree.children) {

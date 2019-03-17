@@ -1,4 +1,5 @@
 import {Subscribable} from "rxjs";
+import {IValueDidChange, Lambda} from "mobx";
 
 declare global {
     namespace JSX {
@@ -195,8 +196,13 @@ declare namespace Micro {
     type MicroNodePrimitive = Node | string | number | false | undefined;
     type MicroNode = MicroNodePrimitive | Subscribable<MicroNode | ArrayUpdate> | ReadonlyArray<MicroNode>;
 
+    export interface Observable<T> {
+        get(): T;
+        observe(listener: (change: IValueDidChange<T>) => void, fireImmediately?: boolean): Lambda;
+    }
+
     type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = {
-        [key in keyof E]: E[key] | Subscribable<E[key]>
+        [key in keyof E]: E[key] | Subscribable<E[key]> | Observable<T>
     };
 
     //

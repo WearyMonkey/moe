@@ -1,6 +1,7 @@
 import {OperatorFunction} from "rxjs";
 import {ArrayUpdate, MicroNodePrimitive} from "./micro_types";
 import {map} from "rxjs/operators";
+export { JSX } from './rxjs_jsx';
 
 interface Foo {
     key: string | number;

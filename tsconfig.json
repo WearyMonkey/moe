@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    "plugins": [
+      {
+        "transform": "./src/tsc_transformer.ts"
+      }
+    ],
     "baseUrl": "./src",
     "experimentalDecorators": true,
     "importHelpers": false,
