@@ -1,32 +1,30 @@
 import {appendTo, h} from './micro';
-import {BehaviorSubject, combineLatest} from "rxjs";
-import {arrayUpdates, JSX} from "./observable_connect";
-import {map} from "rxjs/operators";
+import {JSX} from "./observable_connect";
 import {MicroNode} from "./micro_types";
-import {box, boxArray, BoxArray, compute, ShallowBoxify} from "./moe_data";
+import {Box, box, compute, Ops_Box} from "./moe_data";
 
 type Todo = {
-    id: number,
-    completed: boolean,
-    text: string,
+    id: Box<number>,
+    completed: Box<boolean>,
+    text: Box<string>,
 };
 
 let ids = 0;
-const todos = box([
-    { id: ids++, completed: true, text: 'Taste JavaScript' },
-    { id: ids++, completed: false, text: 'Buy a unicorn' },
-]);
+const todos: Todo[] = [
+    { id: box(ids++), completed: box(true), text: box('Taste JavaScript') },
+    { id: box(ids++), completed: box(false), text: box('Buy a unicorn') },
+];
 
 const filters: ['all', 'active', 'completed'] = ['all', 'active', 'completed'];
 
-const filter = box<typeof filters[number]>('all');
+const filter = box('all');
 
 function TodoApp() {
 
     const onKeydown = (e: KeyboardEvent) => {
         const target = e.target as HTMLInputElement;
         if (e.key === 'Enter' && target.value) {
-            todos.push(box({id: ids++, completed: false, text: target.value}));
+            todos.push({id: box(ids++), completed: box(false), text: box(target.value)});
             target.value = '';
         }
     };
@@ -43,7 +41,9 @@ function TodoApp() {
                 <input id="toggle-all" class="toggle-all" type="checkbox"/>
                 <label htmlFor="toggle-all">Mark all as complete</label>
                 <ul class="todo-list">
-                    {todos.filter(filterTodo, filter).map(todo => <Todo todo={todo}/>)}
+                    {todos
+                        .filter(t => filter === 'all' || filter === 'completed' && t.completed || filter === 'active' && !t.completed)
+                        .map(todo => <Todo todo={todo}/>)}
                 </ul>
             </section>
             <footer class="footer">
@@ -65,10 +65,6 @@ function TodoApp() {
     );
 }
 
-function filterTodo(t: Todo, f: string): boolean {
-    return f === 'all' || f === 'completed' && t.completed || f === 'active' && !t.completed;
-}
-
 function Todo({ todo }: { todo: Todo }): MicroNode {
     const onDelete = () => {
         todos.splice(todos.indexOf(todo), 1);
@@ -79,7 +75,7 @@ function Todo({ todo }: { todo: Todo }): MicroNode {
     };
 
     return (
-        <li class={todo.completed.pipe(map(c => c ? 'completed' : ''))}>
+        <li class={compute(c => c ? 'completed' : '', todo.completed)}>
             <div class="view">
                 <input class="toggle" type="checkbox" checked={todo.completed} onChange={onToggle}/>
                 <label>{todo.text}</label>

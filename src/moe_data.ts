@@ -1,9 +1,21 @@
 
 const BoxSymbol = Symbol();
 
-namespace Ops {
-    function add(lhs: Box<number>, rhs: Box<number>) {
+export namespace Ops_Box {
+    export function add(lhs: Box<number>, rhs: Box<number>) {
         return new Box(1);
+    }
+
+    export function assign(lhs: Box<number>, rhs: number) {
+
+    }
+
+    export function strictEquals<T>(box: Box<T> , v: T): Box<boolean> {
+        return box.get() === v;
+    }
+
+    export function or<T>(lhs: Box<T> , rhs: Box<T>): Box<boolean> {
+
     }
 }
 
@@ -29,7 +41,7 @@ export class Box<T> {
     }
 }
 
-const f = new Box(1) + new Box(2);
+const foo: Box<number> = new Box(1) + new Box(2);
 
 function isBox<T>(b: Box<T> | T): b is Box<T> {
     return (b as any)[BoxSymbol] === true;
